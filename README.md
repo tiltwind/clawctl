@@ -31,6 +31,8 @@ clawctl <command> <name>
 | `clawctl restart <name>` | Restart the gateway |
 | `clawctl status <name>` | Show instance status |
 | `clawctl logs <name>` | Tail instance logs |
+| `clawctl enable <name>` | Install systemd user service for a profile |
+| `clawctl disable <name>` | Uninstall systemd user service |
 | `clawctl list` | List all profiles and their status |
 | `clawctl remove <name>` | Remove a profile (stop + delete) |
 | `clawctl uninstall` | Uninstall OpenClaw (CLI, config) |

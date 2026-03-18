@@ -11,6 +11,8 @@ set -euo pipefail
 #   clawctl restart <name>  - Restart the gateway
 #   clawctl status  <name>  - Show instance status
 #   clawctl logs    <name>  - Tail instance logs
+#   clawctl enable  <name>  - Install systemd user service
+#   clawctl disable <name>  - Uninstall systemd user service
 #   clawctl list            - List all profiles
 #   clawctl remove  <name>  - Remove a profile (stop + delete)
 #   clawctl uninstall       - Uninstall OpenClaw (systemd, CLI, config)
@@ -70,6 +72,17 @@ prompt_choice() {
     else
         echo "$choice"
     fi
+}
+
+get_service_name() {
+    local profile="$1"
+    echo "openclaw-gateway-${profile}"
+}
+
+has_systemd_service() {
+    local service
+    service=$(get_service_name "$1")
+    [[ -f "$HOME/.config/systemd/user/${service}.service" ]]
 }
 
 get_profile_dir() {
@@ -222,6 +235,16 @@ cmd_start() {
         exit 1
     fi
 
+    # Use systemd service if available
+    if has_systemd_service "$profile"; then
+        local service
+        service=$(get_service_name "$profile")
+        info "Starting service: $service"
+        systemctl --user start "$service"
+        systemctl --user status "$service" --no-pager
+        return
+    fi
+
     if is_running "$profile_dir"; then
         local pid
         pid=$(get_pid "$profile_dir")
@@ -278,6 +301,16 @@ cmd_stop() {
         exit 1
     fi
 
+    # Use systemd service if available
+    if has_systemd_service "$profile"; then
+        local service
+        service=$(get_service_name "$profile")
+        info "Stopping service: $service"
+        systemctl --user stop "$service"
+        info "Gateway stopped."
+        return
+    fi
+
     if ! is_running "$profile_dir"; then
         warn "Profile '$profile' is not running."
         # Clean up stale pid file
@@ -313,6 +346,24 @@ cmd_restart() {
         exit 1
     fi
 
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found."
+        exit 1
+    fi
+
+    # Use systemd service if available
+    if has_systemd_service "$profile"; then
+        local service
+        service=$(get_service_name "$profile")
+        info "Restarting service: $service"
+        systemctl --user restart "$service"
+        systemctl --user status "$service" --no-pager
+        return
+    fi
+
     cmd_stop "$profile"
     cmd_start "$profile"
 }
@@ -340,14 +391,24 @@ cmd_status() {
     echo "  Path: $profile_dir"
     echo "  Port: ${port:-?}"
 
-    if is_running "$profile_dir"; then
-        local pid
-        pid=$(get_pid "$profile_dir")
-        echo "  Status: $(color_green 'running') (PID: $pid)"
+    # Use systemd service if available
+    if has_systemd_service "$profile"; then
+        local service
+        service=$(get_service_name "$profile")
+        echo "  Mode: systemd ($service)"
+        echo ""
+        systemctl --user status "$service" --no-pager
     else
-        echo "  Status: $(color_red 'stopped')"
-        # Clean up stale pid file
-        rm -f "$profile_dir/gateway.pid"
+        echo "  Mode: manual (PID file)"
+        if is_running "$profile_dir"; then
+            local pid
+            pid=$(get_pid "$profile_dir")
+            echo "  Status: $(color_green 'running') (PID: $pid)"
+        else
+            echo "  Status: $(color_red 'stopped')"
+            # Clean up stale pid file
+            rm -f "$profile_dir/gateway.pid"
+        fi
     fi
     echo ""
 }
@@ -546,6 +607,110 @@ cmd_onboard() {
     openclaw --profile "$profile" onboard
 }
 
+cmd_install_service() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl enable <name>"
+        exit 1
+    fi
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found. Run 'clawctl create $profile' first."
+        exit 1
+    fi
+
+    local service
+    service=$(get_service_name "$profile")
+    local service_file="$HOME/.config/systemd/user/${service}.service"
+
+    if [[ -f "$service_file" ]]; then
+        warn "Service file already exists: $service_file"
+        local overwrite
+        read -rp "$(color_yellow 'Overwrite? (y/N): ')" overwrite
+        if [[ "$overwrite" != "y" && "$overwrite" != "Y" ]]; then
+            info "Aborted."
+            exit 0
+        fi
+    fi
+
+    local openclaw_bin
+    openclaw_bin=$(command -v openclaw 2>/dev/null || true)
+    if [[ -z "$openclaw_bin" ]]; then
+        error "openclaw command not found. Run 'clawctl install' first."
+        exit 1
+    fi
+
+    local port
+    port=$(grep '^PORT=' "$profile_dir/profile.conf" 2>/dev/null | cut -d= -f2)
+
+    mkdir -p "$HOME/.config/systemd/user"
+
+    cat > "$service_file" << EOF
+[Unit]
+Description=OpenClaw Gateway (${profile})
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${openclaw_bin} --profile ${profile} gateway
+WorkingDirectory=${profile_dir}
+EnvironmentFile=${profile_dir}/.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+    systemctl --user daemon-reload
+    systemctl --user enable "$service"
+
+    info "Service installed: $service"
+    echo ""
+    echo "  Service file: $service_file"
+    echo "  Profile:      $profile"
+    echo "  Port:         ${port:-?}"
+    echo ""
+    echo "  Manage with:"
+    echo "    $(color_cyan "clawctl start $profile")"
+    echo "    $(color_cyan "clawctl stop $profile")"
+    echo "    $(color_cyan "clawctl status $profile")"
+    echo ""
+}
+
+cmd_uninstall_service() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl disable <name>"
+        exit 1
+    fi
+
+    local service
+    service=$(get_service_name "$profile")
+    local service_file="$HOME/.config/systemd/user/${service}.service"
+
+    if [[ ! -f "$service_file" ]]; then
+        error "Service not found: $service_file"
+        exit 1
+    fi
+
+    # Stop if running
+    if systemctl --user is-active "$service" &>/dev/null; then
+        info "Stopping service: $service"
+        systemctl --user stop "$service"
+    fi
+
+    info "Disabling and removing service: $service"
+    systemctl --user disable "$service" 2>/dev/null || true
+    rm -f "$service_file"
+    systemctl --user daemon-reload
+
+    info "Service '$service' uninstalled."
+}
+
 cmd_install() {
     info "Installing OpenClaw..."
     curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
@@ -564,6 +729,8 @@ cmd_help() {
     echo "  $0 $(color_cyan 'restart') <name>    Restart the gateway"
     echo "  $0 $(color_cyan 'status')  <name>    Show instance status"
     echo "  $0 $(color_cyan 'logs')    <name>    Tail instance logs"
+    echo "  $0 $(color_cyan 'enable')  <name>    Install systemd user service"
+    echo "  $0 $(color_cyan 'disable') <name>    Uninstall systemd user service"
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')  <name>    Remove a profile"
     echo "  $0 $(color_cyan 'uninstall')         Uninstall OpenClaw"
@@ -586,6 +753,8 @@ case "$command" in
     restart)    cmd_restart "$@" ;;
     status)     cmd_status "$@" ;;
     logs)       cmd_logs "$@" ;;
+    enable)     cmd_install_service "$@" ;;
+    disable)    cmd_uninstall_service "$@" ;;
     list)       cmd_list "$@" ;;
     remove)     cmd_remove "$@" ;;
     uninstall)  cmd_uninstall "$@" ;;
