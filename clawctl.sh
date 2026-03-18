@@ -248,7 +248,7 @@ cmd_start() {
     local logfile="${profile_dir}/logs/gateway.log"
 
     info "Starting gateway for profile '$profile' on port ${port:-unknown}..."
-    nohup openclaw --profile "$profile_dir/config" gateway >> "$logfile" 2>&1 &
+    nohup openclaw --profile "$profile" gateway >> "$logfile" 2>&1 &
     local pid=$!
     echo "$pid" > "$profile_dir/gateway.pid"
 
@@ -543,7 +543,7 @@ cmd_onboard() {
     fi
 
     info "Running onboard for profile '$profile'..."
-    openclaw --profile "$profile_dir/config" onboard
+    openclaw --profile "$profile" onboard
 }
 
 cmd_install() {
