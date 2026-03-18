@@ -3,6 +3,7 @@ set -euo pipefail
 
 # clawctl - OpenClaw Gateway instance manager (host-native, profile-based)
 # Usage:
+#   clawctl install          - Install OpenClaw
 #   clawctl create  <name>  - Create a new profile interactively
 #   clawctl start   <name>  - Start the gateway
 #   clawctl stop    <name>  - Stop the gateway
@@ -525,11 +526,17 @@ cmd_uninstall() {
     echo ""
 }
 
+cmd_install() {
+    info "Installing OpenClaw..."
+    curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
+}
+
 cmd_help() {
     echo ""
     echo "$(color_green 'clawctl') - OpenClaw Gateway Instance Manager"
     echo ""
     echo "Usage:"
+    echo "  $0 $(color_cyan 'install')            Install OpenClaw"
     echo "  $0 $(color_cyan 'create')  <name>    Create a new profile interactively"
     echo "  $0 $(color_cyan 'start')   <name>    Start the gateway"
     echo "  $0 $(color_cyan 'stop')    <name>    Stop the gateway"
@@ -550,6 +557,7 @@ command="${1:-help}"
 shift || true
 
 case "$command" in
+    install)    cmd_install "$@" ;;
     create)     cmd_create "$@" ;;
     start)      cmd_start "$@" ;;
     stop)       cmd_stop "$@" ;;

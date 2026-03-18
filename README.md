@@ -23,6 +23,7 @@ clawctl <command> <name>
 
 | Command | Description |
 |---|---|
+| `clawctl install` | Install OpenClaw |
 | `clawctl create <name>` | Create a new profile interactively |
 | `clawctl start <name>` | Start the gateway |
 | `clawctl stop <name>` | Stop the gateway |
@@ -47,7 +48,10 @@ During `clawctl create`, you will be prompted for:
 ### Quick start
 
 ```bash
-# 1. Create a profile (interactive prompts for port, sandbox, backend)
+# 1. Install OpenClaw
+clawctl install
+
+# 2. Create a profile (interactive prompts for port, sandbox, backend)
 clawctl create mybot
 
 # 2. Start the gateway
