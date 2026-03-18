@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage:
 #   clawctl install          - Install OpenClaw
 #   clawctl create  <name>  - Create a new profile interactively
+#   clawctl onboard <name>  - Run onboard setup for a profile
 #   clawctl start   <name>  - Start the gateway
 #   clawctl stop    <name>  - Stop the gateway
 #   clawctl restart <name>  - Restart the gateway
@@ -526,6 +527,25 @@ cmd_uninstall() {
     echo ""
 }
 
+cmd_onboard() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl onboard <name>"
+        exit 1
+    fi
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found. Run 'clawctl create $profile' first."
+        exit 1
+    fi
+
+    info "Running onboard for profile '$profile'..."
+    openclaw --profile "$profile_dir/config" onboard
+}
+
 cmd_install() {
     info "Installing OpenClaw..."
     curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
@@ -538,6 +558,7 @@ cmd_help() {
     echo "Usage:"
     echo "  $0 $(color_cyan 'install')            Install OpenClaw"
     echo "  $0 $(color_cyan 'create')  <name>    Create a new profile interactively"
+    echo "  $0 $(color_cyan 'onboard') <name>    Run onboard setup for a profile"
     echo "  $0 $(color_cyan 'start')   <name>    Start the gateway"
     echo "  $0 $(color_cyan 'stop')    <name>    Stop the gateway"
     echo "  $0 $(color_cyan 'restart') <name>    Restart the gateway"
@@ -559,6 +580,7 @@ shift || true
 case "$command" in
     install)    cmd_install "$@" ;;
     create)     cmd_create "$@" ;;
+    onboard)    cmd_onboard "$@" ;;
     start)      cmd_start "$@" ;;
     stop)       cmd_stop "$@" ;;
     restart)    cmd_restart "$@" ;;

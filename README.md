@@ -25,6 +25,7 @@ clawctl <command> <name>
 |---|---|
 | `clawctl install` | Install OpenClaw |
 | `clawctl create <name>` | Create a new profile interactively |
+| `clawctl onboard <name>` | Run onboard setup for a profile |
 | `clawctl start <name>` | Start the gateway |
 | `clawctl stop <name>` | Stop the gateway |
 | `clawctl restart <name>` | Restart the gateway |
@@ -54,13 +55,13 @@ clawctl install
 # 2. Create a profile (interactive prompts for port, sandbox, backend)
 clawctl create mybot
 
-# 2. Start the gateway
+# 3. Run onboard setup
+clawctl onboard mybot
+
+# 4. Start the gateway
 clawctl start mybot
 
-# 3. Configure OpenClaw
-openclaw --profile ~/.clawctl/profiles/mybot/config onboard
-
-# 4. Check status
+# 5. Check status
 clawctl status mybot
 ```
 
