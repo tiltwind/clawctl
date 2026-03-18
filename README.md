@@ -23,19 +23,19 @@ clawctl <command> <name>
 
 | Command | Description |
 |---|---|
-| `clawctl install` | Install OpenClaw |
+| `clawctl setup` | Setup OpenClaw |
 | `clawctl create <name>` | Create a new profile interactively |
 | `clawctl onboard <name>` | Run onboard setup for a profile |
+| `clawctl install <name>` | Install systemd user service for a profile |
+| `clawctl uninstall <name>` | Uninstall systemd user service |
 | `clawctl start <name>` | Start the gateway |
 | `clawctl stop <name>` | Stop the gateway |
 | `clawctl restart <name>` | Restart the gateway |
 | `clawctl status <name>` | Show instance status |
 | `clawctl logs <name>` | Tail instance logs |
-| `clawctl enable <name>` | Install systemd user service for a profile |
-| `clawctl disable <name>` | Uninstall systemd user service |
 | `clawctl list` | List all profiles and their status |
 | `clawctl remove <name>` | Remove a profile (stop + delete) |
-| `clawctl uninstall` | Uninstall OpenClaw (CLI, config) |
+| `clawctl clean` | Clean OpenClaw (stop all, remove CLI, config) |
 | `clawctl help` | Show help |
 
 ### Create options
@@ -51,8 +51,8 @@ During `clawctl create`, you will be prompted for:
 ### Quick start
 
 ```bash
-# 1. Install OpenClaw
-clawctl install
+# 1. Setup OpenClaw
+clawctl setup
 
 # 2. Create a profile (interactive prompts for port, sandbox, backend)
 clawctl create mybot
