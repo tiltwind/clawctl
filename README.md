@@ -32,21 +32,14 @@ clawctl <command> <name>
 | `clawctl stop <name>` | Stop the gateway |
 | `clawctl restart <name>` | Restart the gateway |
 | `clawctl status <name>` | Show instance status |
-| `clawctl logs <name>` | Tail instance logs |
+| `clawctl logs <name>` | View instance logs (`--follow`, `--limit <n>`) |
+| `clawctl config <name> [args...]` | Configure a profile (passthrough to openclaw) |
+| `clawctl sandbox <name> [args...]` | Manage sandbox (explain, list, recreate, etc.) |
+| `clawctl buildimage` | Build Docker image from openclaw source |
 | `clawctl list` | List all profiles and their status |
 | `clawctl remove <name>` | Remove a profile (stop + delete) |
 | `clawctl clean` | Clean OpenClaw (stop all, remove CLI, config) |
 | `clawctl help` | Show help |
-
-### Create options
-
-During `clawctl create`, you will be prompted for:
-
-| Option | Choices | Default | Description |
-|---|---|---|---|
-| Port | any | `18789` | Gateway listen port |
-| Sandbox | `off`, `non-main`, `all` | `all` | Sandbox mode ([docs](https://docs.openclaw.ai/gateway/sandboxing)) |
-| Backend | `docker`, `openshell` | `docker` | Execution backend |
 
 ### Quick start
 
@@ -54,16 +47,19 @@ During `clawctl create`, you will be prompted for:
 # 1. Setup OpenClaw
 clawctl setup
 
-# 2. Create a profile (interactive prompts for port, sandbox, backend)
+# 2. Create a profile
 clawctl create mybot
 
-# 3. Run onboard setup
+# 3. Configure sandbox, backend, etc.
+clawctl config mybot ...
+
+# 4. Run onboard setup
 clawctl onboard mybot
 
-# 4. Start the gateway
+# 5. Start the gateway
 clawctl start mybot
 
-# 5. Check status
+# 6. Check status
 clawctl status mybot
 ```
 
@@ -96,6 +92,61 @@ Each profile is stored under `~/.clawctl/profiles/<name>/`:
 ├── .env                    # Environment variables (token, etc.)
 ├── profile.conf            # Profile metadata (name, port, created)
 └── gateway.pid             # PID file (when running)
+```
+
+## Docker sandbox setup
+
+To run agents in a Docker sandbox, you need a sandbox image and configure the profile accordingly.
+
+### Build or pull the sandbox image
+
+**Option 1: Build from source**
+
+```bash
+clawctl buildimage
+```
+
+This will clone/update the [openclaw](https://github.com/openclaw/openclaw) repo, checkout the latest stable tag, and let you choose a Dockerfile to build.
+
+**Option 2: Pull a pre-built image**
+
+```bash
+docker pull openclaw-sandbox:latest
+docker tag openclaw-sandbox:latest openclaw-sandbox:bookworm-slim
+```
+
+### Configure Docker sandbox
+
+Use `clawctl config` to set sandbox mode and Docker parameters. See [sandbox docs](https://docs.openclaw.ai/cli/sandbox) for full reference.
+
+```bash
+# Set sandbox mode: off | non-main | all
+clawctl config mybot set sandbox "all"
+
+# Set Docker sandbox image
+clawctl config mybot set agents.defaults.sandbox.docker.image "openclaw-sandbox:bookworm-slim"
+
+# Set container name prefix
+clawctl config mybot set agents.defaults.sandbox.docker.containerPrefix "openclaw-sbx-"
+
+# Set auto-prune: remove idle containers after N hours
+clawctl config mybot set agents.defaults.sandbox.prune.idleHours 24
+
+# Set auto-prune: remove containers older than N days
+clawctl config mybot set agents.defaults.sandbox.prune.maxAgeDays 7
+```
+
+### Manage sandboxes
+
+```bash
+# Show effective sandbox configuration
+clawctl sandbox mybot explain
+
+# List all sandbox runtimes
+clawctl sandbox mybot list
+
+# Recreate sandboxes after config changes
+clawctl sandbox mybot recreate --all
 ```
 
 ## Update

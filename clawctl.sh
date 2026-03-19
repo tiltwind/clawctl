@@ -12,6 +12,7 @@ set -euo pipefail
 #   clawctl status  <name>  - Show instance status
 #   clawctl logs    <name> [--follow] [--limit <n>]  - View instance logs
 #   clawctl config  <name> [args...]  - Configure a profile (passthrough to openclaw)
+#   clawctl sandbox <name> [args...]  - Manage sandbox (passthrough to openclaw)
 #   clawctl install   <name> - Install systemd user service
 #   clawctl uninstall <name> - Uninstall systemd user service
 #   clawctl list            - List all profiles
@@ -631,6 +632,25 @@ cmd_config() {
     openclaw --profile "$profile" config "$@"
 }
 
+cmd_sandbox() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl sandbox <name> [args...]"
+        exit 1
+    fi
+    shift
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found."
+        exit 1
+    fi
+
+    openclaw --profile "$profile" sandbox "$@"
+}
+
 cmd_onboard() {
     local profile="${1:-}"
     if [[ -z "$profile" ]]; then
@@ -775,6 +795,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'status')    <name>  Show instance status"
     echo "  $0 $(color_cyan 'logs')      <name> [--follow] [--limit <n>]  View instance logs"
     echo "  $0 $(color_cyan 'config')    <name> [args...]  Configure a profile"
+    echo "  $0 $(color_cyan 'sandbox')   <name> [args...]  Manage sandbox"
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')    <name>  Remove a profile"
     echo "  $0 $(color_cyan 'clean')             Clean OpenClaw (stop all, remove CLI, config)"
@@ -801,6 +822,7 @@ case "$command" in
     status)     cmd_status "$@" ;;
     logs)       cmd_logs "$@" ;;
     config)     cmd_config "$@" ;;
+    sandbox)    cmd_sandbox "$@" ;;
     list)       cmd_list "$@" ;;
     remove)     cmd_remove "$@" ;;
     clean)      cmd_clean "$@" ;;
