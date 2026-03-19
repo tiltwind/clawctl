@@ -11,11 +11,13 @@ set -euo pipefail
 #   clawctl restart <name>  - Restart the gateway
 #   clawctl status  <name>  - Show instance status
 #   clawctl logs    <name> [--follow] [--limit <n>]  - View instance logs
+#   clawctl config  <name> [args...]  - Configure a profile (passthrough to openclaw)
 #   clawctl install   <name> - Install systemd user service
 #   clawctl uninstall <name> - Uninstall systemd user service
 #   clawctl list            - List all profiles
 #   clawctl remove  <name>  - Remove a profile (stop + delete)
 #   clawctl clean           - Clean OpenClaw (stop all, remove CLI, config)
+#   clawctl buildimage      - Build Docker image from openclaw source
 
 CLAWCTL_HOME="${CLAWCTL_HOME:-$HOME/.clawctl}"
 PROFILES_DIR="${CLAWCTL_HOME}/profiles"
@@ -163,15 +165,7 @@ cmd_create() {
         exit 1
     fi
 
-    # 3. Sandbox mode
-    local sandbox
-    sandbox=$(prompt_choice "Sandbox mode:" "all" "off" "non-main" "all")
-
-    # 4. Backend
-    local backend
-    backend=$(prompt_choice "Backend:" "docker" "docker" "openshell")
-
-    # 5. Gateway token
+    # 3. Gateway token
     local token
     token=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p | head -c 32)
 
@@ -191,9 +185,7 @@ EOF
 {
   "gateway": {
     "port": ${port}
-  },
-  "sandbox": "${sandbox}",
-  "backend": "${backend}"
+  }
 }
 EOF
 
@@ -201,8 +193,6 @@ EOF
     cat > "$profile_dir/profile.conf" << EOF
 NAME=${profile}
 PORT=${port}
-SANDBOX=${sandbox}
-BACKEND=${backend}
 CREATED=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 EOF
 
@@ -211,12 +201,10 @@ EOF
     echo ""
     echo "  Profile dir: $profile_dir"
     echo "  Port:        $port"
-    echo "  Sandbox:     $sandbox"
-    echo "  Backend:     $backend"
     echo ""
     echo "  Next steps:"
-    echo "    1. Start:     $(color_cyan "clawctl start $profile")"
-    echo "    2. Configure: $(color_cyan "openclaw --profile $profile onboard")"
+    echo "    1. Configure: $(color_cyan "clawctl config $profile ...")"
+    echo "    2. Start:     $(color_cyan "clawctl start $profile")"
     echo ""
 }
 
@@ -624,6 +612,25 @@ cmd_clean() {
     echo ""
 }
 
+cmd_config() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl config <name> [args...]"
+        exit 1
+    fi
+    shift
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found."
+        exit 1
+    fi
+
+    openclaw --profile "$profile" config "$@"
+}
+
 cmd_onboard() {
     local profile="${1:-}"
     if [[ -z "$profile" ]]; then
@@ -678,6 +685,80 @@ cmd_setup() {
     curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard
 }
 
+cmd_buildimage() {
+    local src_dir="$HOME/.openclaw/openclaw-src"
+    local repo_url="https://github.com/openclaw/openclaw.git"
+
+    # Clone or update the repo
+    if [[ -d "$src_dir/.git" ]]; then
+        info "Updating openclaw source..."
+        git -C "$src_dir" fetch --tags --force
+        git -C "$src_dir" fetch --prune
+    else
+        info "Cloning openclaw source..."
+        mkdir -p "$(dirname "$src_dir")"
+        git clone "$repo_url" "$src_dir"
+    fi
+
+    # Find latest non-beta release tag (semver: vX.Y.Z without beta/alpha/rc suffix)
+    local latest_tag
+    latest_tag=$(git -C "$src_dir" tag -l 'v*' \
+        | grep -v -iE '(alpha|beta|rc)' \
+        | sort -V \
+        | tail -n 1)
+
+    if [[ -z "$latest_tag" ]]; then
+        error "No stable release tag found."
+        exit 1
+    fi
+
+    info "Checking out latest stable tag: $latest_tag"
+    git -C "$src_dir" checkout "$latest_tag" --quiet
+
+    # List Dockerfiles in root directory
+    local dockerfiles=()
+    while IFS= read -r -d '' f; do
+        dockerfiles+=("$(basename "$f")")
+    done < <(find "$src_dir" -maxdepth 1 -name 'Dockerfile*' -print0 | sort -z)
+
+    if [[ ${#dockerfiles[@]} -eq 0 ]]; then
+        error "No Dockerfile found in $src_dir"
+        exit 1
+    fi
+
+    echo ""
+    echo "$(color_cyan 'Available Dockerfiles:')"
+    for i in "${!dockerfiles[@]}"; do
+        echo "  $((i+1))) ${dockerfiles[$i]}"
+    done
+    echo ""
+
+    local choice
+    read -rp "$(color_cyan 'Choose Dockerfile to build') [1]: " choice
+    choice="${choice:-1}"
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#dockerfiles[@]} )); then
+        error "Invalid choice: $choice"
+        exit 1
+    fi
+
+    local selected="${dockerfiles[$((choice-1))]}"
+    local image_name="openclaw:${latest_tag}"
+
+    # If not the default Dockerfile, append a suffix to the image name
+    if [[ "$selected" != "Dockerfile" ]]; then
+        local suffix="${selected#Dockerfile.}"
+        image_name="openclaw-${suffix}:${latest_tag}"
+    fi
+
+    echo ""
+    info "Building image '${image_name}' from ${selected}..."
+    docker build -t "$image_name" -f "$src_dir/$selected" "$src_dir"
+
+    echo ""
+    info "Image '${image_name}' built successfully!"
+}
+
 cmd_help() {
     echo ""
     echo "$(color_green 'clawctl') - OpenClaw Gateway Instance Manager"
@@ -693,9 +774,11 @@ cmd_help() {
     echo "  $0 $(color_cyan 'restart')   <name>  Restart the gateway"
     echo "  $0 $(color_cyan 'status')    <name>  Show instance status"
     echo "  $0 $(color_cyan 'logs')      <name> [--follow] [--limit <n>]  View instance logs"
+    echo "  $0 $(color_cyan 'config')    <name> [args...]  Configure a profile"
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')    <name>  Remove a profile"
     echo "  $0 $(color_cyan 'clean')             Clean OpenClaw (stop all, remove CLI, config)"
+    echo "  $0 $(color_cyan 'buildimage')        Build Docker image from openclaw source"
     echo ""
     echo "Profiles are stored in: $PROFILES_DIR"
     echo ""
@@ -717,9 +800,11 @@ case "$command" in
     restart)    cmd_restart "$@" ;;
     status)     cmd_status "$@" ;;
     logs)       cmd_logs "$@" ;;
+    config)     cmd_config "$@" ;;
     list)       cmd_list "$@" ;;
     remove)     cmd_remove "$@" ;;
     clean)      cmd_clean "$@" ;;
+    buildimage) cmd_buildimage "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
         error "Unknown command: $command"
