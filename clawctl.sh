@@ -10,7 +10,7 @@ set -euo pipefail
 #   clawctl stop    <name>  - Stop the gateway
 #   clawctl restart <name>  - Restart the gateway
 #   clawctl status  <name>  - Show instance status
-#   clawctl logs    <name>  - Tail instance logs
+#   clawctl logs    <name> [--follow] [--limit <n>]  - View instance logs
 #   clawctl install   <name> - Install systemd user service
 #   clawctl uninstall <name> - Uninstall systemd user service
 #   clawctl list            - List all profiles
@@ -414,9 +414,43 @@ cmd_status() {
 }
 
 cmd_logs() {
-    local profile="${1:-}"
+    local profile=""
+    local follow=false
+    local limit=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --follow|-f)
+                follow=true
+                shift
+                ;;
+            --limit|-n)
+                if [[ -z "${2:-}" ]]; then
+                    error "--limit requires a number"
+                    exit 1
+                fi
+                limit="$2"
+                shift 2
+                ;;
+            -*)
+                error "Unknown option: $1"
+                error "Usage: clawctl logs <name> [--follow] [--limit <n>]"
+                exit 1
+                ;;
+            *)
+                if [[ -z "$profile" ]]; then
+                    profile="$1"
+                else
+                    error "Unexpected argument: $1"
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
     if [[ -z "$profile" ]]; then
-        error "Usage: clawctl logs <name>"
+        error "Usage: clawctl logs <name> [--follow] [--limit <n>]"
         exit 1
     fi
 
@@ -428,13 +462,15 @@ cmd_logs() {
         exit 1
     fi
 
-    local logfile="${profile_dir}/logs/gateway.log"
-    if [[ ! -f "$logfile" ]]; then
-        warn "No log file found at: $logfile"
-        exit 0
+    local cmd=(openclaw --profile "$profile" logs)
+    if [[ "$follow" == true ]]; then
+        cmd+=(--follow)
+    fi
+    if [[ -n "$limit" ]]; then
+        cmd+=(--limit "$limit")
     fi
 
-    tail -f "$logfile"
+    "${cmd[@]}"
 }
 
 cmd_list() {
@@ -656,7 +692,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'stop')      <name>  Stop the gateway"
     echo "  $0 $(color_cyan 'restart')   <name>  Restart the gateway"
     echo "  $0 $(color_cyan 'status')    <name>  Show instance status"
-    echo "  $0 $(color_cyan 'logs')      <name>  Tail instance logs"
+    echo "  $0 $(color_cyan 'logs')      <name> [--follow] [--limit <n>]  View instance logs"
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')    <name>  Remove a profile"
     echo "  $0 $(color_cyan 'clean')             Clean OpenClaw (stop all, remove CLI, config)"
