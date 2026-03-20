@@ -121,7 +121,7 @@ Use `clawctl config` to set sandbox mode and Docker parameters. See [sandbox doc
 
 ```bash
 # Set sandbox mode: off | non-main | all
-clawctl config mybot set sandbox "all"
+clawctl config mybot set agents.defaults.sandbox.mode "all"
 
 # Set Docker sandbox image
 clawctl config mybot set agents.defaults.sandbox.docker.image "openclaw-sandbox:bookworm-slim"
@@ -134,6 +134,9 @@ clawctl config mybot set agents.defaults.sandbox.prune.idleHours 24
 
 # Set auto-prune: remove containers older than N days
 clawctl config mybot set agents.defaults.sandbox.prune.maxAgeDays 7
+
+# Enable network access for sandbox containers (default: "none")
+clawctl config mybot set agents.defaults.sandbox.docker.network "bridge"
 ```
 
 ### Manage sandboxes
