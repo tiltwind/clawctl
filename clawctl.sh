@@ -115,6 +115,26 @@ get_pid() {
     fi
 }
 
+load_profile_env() {
+    local profile_dir="$1"
+    if [[ -f "$profile_dir/.env" ]]; then
+        set -a
+        # shellcheck disable=SC1091
+        source "$profile_dir/.env"
+        set +a
+    fi
+}
+
+# Run openclaw with OPENCLAW_HOME set to the profile directory.
+# This ensures all openclaw data (config, plugins, workspace, etc.)
+# lives under $PROFILES_DIR/<profile>/ instead of scattered across
+# ~/.openclaw, ~/.openclaw-<profile>, etc.
+run_openclaw() {
+    local profile_dir="$1"
+    shift
+    OPENCLAW_HOME="$profile_dir" openclaw "$@"
+}
+
 # ─── Commands ─────────────────────────────────────────────────────────────────
 
 cmd_create() {
@@ -251,17 +271,12 @@ cmd_start() {
     fi
 
     # Load environment variables
-    if [[ -f "$profile_dir/.env" ]]; then
-        set -a
-        # shellcheck disable=SC1091
-        source "$profile_dir/.env"
-        set +a
-    fi
+    load_profile_env "$profile_dir"
 
     local logfile="${profile_dir}/logs/gateway.log"
 
     info "Starting gateway for profile '$profile' on port ${port:-unknown}..."
-    nohup openclaw --profile "$profile" gateway >> "$logfile" 2>&1 &
+    nohup env OPENCLAW_HOME="$profile_dir" openclaw gateway >> "$logfile" 2>&1 &
     local pid=$!
     echo "$pid" > "$profile_dir/gateway.pid"
 
@@ -452,15 +467,19 @@ cmd_logs() {
         exit 1
     fi
 
-    local cmd=(openclaw --profile "$profile" logs)
-    if [[ "$follow" == true ]]; then
-        cmd+=(--follow)
-    fi
-    if [[ -n "$limit" ]]; then
-        cmd+=(--limit "$limit")
+    local logfile="${profile_dir}/logs/gateway.log"
+    if [[ ! -f "$logfile" ]]; then
+        error "No log file found at: $logfile"
+        exit 1
     fi
 
-    "${cmd[@]}"
+    if [[ "$follow" == true ]]; then
+        tail -f ${limit:+-n "$limit"} "$logfile"
+    elif [[ -n "$limit" ]]; then
+        tail -n "$limit" "$logfile"
+    else
+        tail -n 200 "$logfile"
+    fi
 }
 
 cmd_list() {
@@ -551,7 +570,7 @@ cmd_clean() {
     warn "This will perform the following actions:"
     echo "  1. Stop all running gateway instances"
     echo "  2. Uninstall OpenClaw CLI (npm uninstall -g openclaw)"
-    echo "  3. Remove config files (~/.openclaw, ~/.config/openclaw)"
+    echo "  3. Remove config files (~/.openclaw, ~/.openclaw-*, ~/.config/openclaw)"
     echo ""
 
     local confirm
@@ -602,6 +621,7 @@ cmd_clean() {
     # STEP 3. Clean up config files
     info "[3/3] Cleaning up config files..."
     rm -rf ~/.openclaw
+    rm -rf ~/.openclaw-*
     rm -rf ~/.config/openclaw
     echo "  Config files removed"
 
@@ -630,7 +650,8 @@ cmd_config() {
         exit 1
     fi
 
-    openclaw --profile "$profile" config "$@"
+    load_profile_env "$profile_dir"
+    run_openclaw "$profile_dir" config "$@"
 }
 
 cmd_sandbox() {
@@ -649,7 +670,8 @@ cmd_sandbox() {
         exit 1
     fi
 
-    openclaw --profile "$profile" sandbox "$@"
+    load_profile_env "$profile_dir"
+    run_openclaw "$profile_dir" sandbox "$@"
 }
 
 cmd_wechat() {
@@ -673,13 +695,15 @@ cmd_wechat() {
     echo "$(color_green '╚══════════════════════════════════════════╝')"
     echo ""
 
+    load_profile_env "$profile_dir"
+
     # Step 1: Install the WeChat plugin into the profile
     info "[1/3] Installing WeChat plugin..."
-    openclaw --profile "$profile" plugins install "@tencent-weixin/openclaw-weixin@1.0.3"
+    run_openclaw "$profile_dir" plugins install "@tencent-weixin/openclaw-weixin@1.0.3"
 
     # Step 2: Enable the plugin
     info "[2/3] Enabling WeChat plugin..."
-    openclaw --profile "$profile" config set plugins.entries.openclaw-weixin.enabled true
+    run_openclaw "$profile_dir" config set plugins.entries.openclaw-weixin.enabled true
 
     # Step 3: Restart gateway if running to pick up the new plugin
     info "[3/3] Restarting gateway..."
@@ -713,8 +737,9 @@ cmd_onboard() {
         exit 1
     fi
 
+    load_profile_env "$profile_dir"
     info "Running onboard for profile '$profile'..."
-    openclaw --profile "$profile" onboard
+    run_openclaw "$profile_dir" onboard
 }
 
 cmd_install_service() {
@@ -732,8 +757,9 @@ cmd_install_service() {
         exit 1
     fi
 
+    load_profile_env "$profile_dir"
     info "Installing systemd service for profile '$profile'..."
-    openclaw --profile "$profile" gateway install
+    run_openclaw "$profile_dir" gateway install
 }
 
 cmd_uninstall_service() {
@@ -743,8 +769,11 @@ cmd_uninstall_service() {
         exit 1
     fi
 
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+    load_profile_env "$profile_dir"
     info "Uninstalling systemd service for profile '$profile'..."
-    openclaw --profile "$profile" gateway uninstall
+    run_openclaw "$profile_dir" gateway uninstall
 }
 
 cmd_setup() {
@@ -753,7 +782,7 @@ cmd_setup() {
 }
 
 cmd_buildimage() {
-    local src_dir="$HOME/.openclaw/openclaw-src"
+    local src_dir="${CLAWCTL_HOME}/openclaw-src"
     local repo_url="https://github.com/openclaw/openclaw.git"
 
     # Clone or update the repo
