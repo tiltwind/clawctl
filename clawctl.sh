@@ -15,6 +15,7 @@ set -euo pipefail
 #   clawctl sandbox <name> [args...]  - Manage sandbox (passthrough to openclaw)
 #   clawctl install   <name> - Install systemd user service
 #   clawctl uninstall <name> - Uninstall systemd user service
+#   clawctl wechat  <name>  - Configure WeChat channel
 #   clawctl list            - List all profiles
 #   clawctl remove  <name>  - Remove a profile (stop + delete)
 #   clawctl clean           - Clean OpenClaw (stop all, remove CLI, config)
@@ -651,6 +652,63 @@ cmd_sandbox() {
     openclaw --profile "$profile" sandbox "$@"
 }
 
+cmd_wechat() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl wechat <name>"
+        exit 1
+    fi
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found. Run 'clawctl create $profile' first."
+        exit 1
+    fi
+
+    echo ""
+    echo "$(color_green '╔══════════════════════════════════════════╗')"
+    echo "$(color_green '║')   WeChat Channel Setup                    $(color_green '║')"
+    echo "$(color_green '╚══════════════════════════════════════════╝')"
+    echo ""
+
+    # Check if Node.js / npx is available
+    if ! command -v npx &>/dev/null; then
+        error "npx not found. Please install Node.js first."
+        exit 1
+    fi
+
+    # Step 1: Install the WeChat plugin via the official CLI
+    info "[1/4] Installing WeChat plugin..."
+    OPENCLAW_PROFILE="$profile" npx -y @tencent-weixin/openclaw-weixin-cli@latest install
+
+    # Step 2: Enable the plugin
+    info "[2/4] Enabling WeChat plugin..."
+    openclaw --profile "$profile" config set plugins.entries.openclaw-weixin.enabled true
+
+    # Step 3: Restart gateway if running
+    info "[3/4] Restarting gateway..."
+    if is_running "$profile_dir" || has_systemd_service "$profile"; then
+        cmd_restart "$profile"
+    else
+        warn "Gateway is not running. Start it with: clawctl start $profile"
+    fi
+
+    # Step 4: Trigger QR code login
+    info "[4/4] Starting WeChat login (scan QR code with WeChat)..."
+    openclaw --profile "$profile" channels login --channel openclaw-weixin
+
+    echo ""
+    info "WeChat channel configured for profile '$profile'!"
+    echo ""
+    echo "  Tips:"
+    echo "    - To re-login:  $(color_cyan "clawctl config $profile channels login --channel openclaw-weixin")"
+    echo "    - To isolate conversations per user:"
+    echo "        $(color_cyan "clawctl config $profile set agents.mode per-channel-per-peer")"
+    echo ""
+}
+
 cmd_onboard() {
     local profile="${1:-}"
     if [[ -z "$profile" ]]; then
@@ -796,6 +854,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'logs')      <name> [--follow] [--limit <n>]  View instance logs"
     echo "  $0 $(color_cyan 'config')    <name> [args...]  Configure a profile"
     echo "  $0 $(color_cyan 'sandbox')   <name> [args...]  Manage sandbox"
+    echo "  $0 $(color_cyan 'wechat')    <name>  Configure WeChat channel"
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')    <name>  Remove a profile"
     echo "  $0 $(color_cyan 'clean')             Clean OpenClaw (stop all, remove CLI, config)"
@@ -823,6 +882,7 @@ case "$command" in
     logs)       cmd_logs "$@" ;;
     config)     cmd_config "$@" ;;
     sandbox)    cmd_sandbox "$@" ;;
+    wechat)     cmd_wechat "$@" ;;
     list)       cmd_list "$@" ;;
     remove)     cmd_remove "$@" ;;
     clean)      cmd_clean "$@" ;;
