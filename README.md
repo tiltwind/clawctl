@@ -162,10 +162,9 @@ clawctl wechat mybot
 ```
 
 This will:
-1. Install the `@tencent-weixin/openclaw-weixin` plugin
+1. Install the `@tencent-weixin/openclaw-weixin` plugin into the profile
 2. Enable the plugin in your profile config
-3. Restart the gateway
-4. Display a QR code — scan it with WeChat to bind
+3. Restart the gateway to load the plugin
 
 ```bash
 # Isolate conversations per WeChat user

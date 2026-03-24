@@ -673,19 +673,16 @@ cmd_wechat() {
     echo "$(color_green '╚══════════════════════════════════════════╝')"
     echo ""
 
-    # Check if Node.js / npx is available
-    if ! command -v npx &>/dev/null; then
-        error "npx not found. Please install Node.js first."
-        exit 1
-    fi
+    # Step 1: Install the WeChat plugin into the profile
+    info "[1/3] Installing WeChat plugin..."
+    openclaw --profile "$profile" plugins install "@tencent-weixin/openclaw-weixin@1.0.3"
 
-    # Install plugin, enable, and trigger QR code login via the official CLI
-    # The CLI handles: plugin install + enable + QR code display
-    info "Installing and configuring WeChat plugin..."
-    npx -y @tencent-weixin/openclaw-weixin-cli@latest install --profile "$profile"
+    # Step 2: Enable the plugin
+    info "[2/3] Enabling WeChat plugin..."
+    openclaw --profile "$profile" config set plugins.entries.openclaw-weixin.enabled true
 
-    # Restart gateway if running to pick up the new plugin
-    info "Restarting gateway..."
+    # Step 3: Restart gateway if running to pick up the new plugin
+    info "[3/3] Restarting gateway..."
     if is_running "$profile_dir" || has_systemd_service "$profile"; then
         cmd_restart "$profile"
     else
