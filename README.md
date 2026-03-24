@@ -157,13 +157,6 @@ clawctl sandbox mybot recreate --all
 
 Connect your OpenClaw gateway to WeChat so you can chat with AI directly in WeChat.
 
-### Prerequisites
-
-- WeChat iOS 8.0.70+ (or equivalent Android version)
-- Profile already created and gateway running
-
-### Quick setup
-
 ```bash
 clawctl wechat mybot
 ```
@@ -174,30 +167,9 @@ This will:
 3. Restart the gateway
 4. Display a QR code — scan it with WeChat to bind
 
-### Manual setup (alternative)
-
-```bash
-# Install plugin
-npx -y @tencent-weixin/openclaw-weixin-cli@latest install
-
-# Enable plugin
-clawctl config mybot set plugins.entries.openclaw-weixin.enabled true
-
-# Restart gateway
-clawctl restart mybot
-
-# Trigger QR code login
-clawctl config mybot channels login --channel openclaw-weixin
-```
-
-### Configuration
-
 ```bash
 # Isolate conversations per WeChat user
 clawctl config mybot set agents.mode per-channel-per-peer
-
-# Re-login (regenerate QR code)
-clawctl config mybot channels login --channel openclaw-weixin
 ```
 
 > **Note:** Group chat is not supported — only private/DM conversations work. Streaming output is not available; responses arrive as complete messages.

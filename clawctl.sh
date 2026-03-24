@@ -679,31 +679,23 @@ cmd_wechat() {
         exit 1
     fi
 
-    # Step 1: Install the WeChat plugin via the official CLI
-    info "[1/4] Installing WeChat plugin..."
-    OPENCLAW_PROFILE="$profile" npx -y @tencent-weixin/openclaw-weixin-cli@latest install
+    # Install plugin, enable, and trigger QR code login via the official CLI
+    # The CLI handles: plugin install + enable + QR code display
+    info "Installing and configuring WeChat plugin..."
+    npx -y @tencent-weixin/openclaw-weixin-cli@latest install --profile "$profile"
 
-    # Step 2: Enable the plugin
-    info "[2/4] Enabling WeChat plugin..."
-    openclaw --profile "$profile" config set plugins.entries.openclaw-weixin.enabled true
-
-    # Step 3: Restart gateway if running
-    info "[3/4] Restarting gateway..."
+    # Restart gateway if running to pick up the new plugin
+    info "Restarting gateway..."
     if is_running "$profile_dir" || has_systemd_service "$profile"; then
         cmd_restart "$profile"
     else
         warn "Gateway is not running. Start it with: clawctl start $profile"
     fi
 
-    # Step 4: Trigger QR code login
-    info "[4/4] Starting WeChat login (scan QR code with WeChat)..."
-    openclaw --profile "$profile" channels login --channel openclaw-weixin
-
     echo ""
     info "WeChat channel configured for profile '$profile'!"
     echo ""
     echo "  Tips:"
-    echo "    - To re-login:  $(color_cyan "clawctl config $profile channels login --channel openclaw-weixin")"
     echo "    - To isolate conversations per user:"
     echo "        $(color_cyan "clawctl config $profile set agents.mode per-channel-per-peer")"
     echo ""
