@@ -95,63 +95,58 @@ Each profile is stored under `~/.clawctl/profiles/<name>/`:
 └── gateway.pid             # PID file (when running)
 ```
 
-## Docker sandbox setup
+## Common configurations
 
-To run agents in a Docker sandbox, you need a sandbox image and configure the profile accordingly.
+Use `clawctl config <name> set <key> <value>` to configure a profile. Below are frequently used settings.
 
-### Build or pull the sandbox image
+### Proxy
 
-**Option 1: Build from source**
+If your network requires a proxy to access external services (e.g., LLM APIs), add proxy environment variables to the profile's `.env` file:
 
 ```bash
-clawctl buildimage
+# ~/.clawctl/profiles/mybot/.env
+OPENCLAW_GATEWAY_TOKEN=your-token
+https_proxy=http://127.0.0.1:7890
+http_proxy=http://127.0.0.1:7890
+all_proxy=socks5://127.0.0.1:7890
 ```
 
-This will clone/update the [openclaw](https://github.com/openclaw/openclaw) repo, checkout the latest stable tag, and let you choose a Dockerfile to build.
 
-**Option 2: Pull a pre-built image**
+### Agent mode
+
+Isolate conversations per user/channel (useful for multi-user scenarios like WeChat):
 
 ```bash
-docker pull openclaw-sandbox:latest
-docker tag openclaw-sandbox:latest openclaw-sandbox:bookworm-slim
+clawctl config mybot set agents.mode per-channel-per-peer
 ```
 
-### Configure Docker sandbox
+### Network access (sandbox)
 
-Use `clawctl config` to set sandbox mode and Docker parameters. See [sandbox docs](https://docs.openclaw.ai/cli/sandbox) for full reference.
+By default, sandbox containers have no network access. To allow agents to access the internet:
 
 ```bash
-# Set sandbox mode: off | non-main | all
-clawctl config mybot set agents.defaults.sandbox.mode "all"
-
-# Set Docker sandbox image
-clawctl config mybot set agents.defaults.sandbox.docker.image "openclaw-sandbox:bookworm-slim"
-
-# Set container name prefix
-clawctl config mybot set agents.defaults.sandbox.docker.containerPrefix "openclaw-sbx-"
-
-# Set auto-prune: remove idle containers after N hours
-clawctl config mybot set agents.defaults.sandbox.prune.idleHours 24
-
-# Set auto-prune: remove containers older than N days
-clawctl config mybot set agents.defaults.sandbox.prune.maxAgeDays 7
-
-# Enable network access for sandbox containers (default: "none")
 clawctl config mybot set agents.defaults.sandbox.docker.network "bridge"
 ```
 
-### Manage sandboxes
+To disable network access again:
 
 ```bash
-# Show effective sandbox configuration
-clawctl sandbox mybot explain
-
-# List all sandbox runtimes
-clawctl sandbox mybot list
-
-# Recreate sandboxes after config changes
-clawctl sandbox mybot recreate --all
+clawctl config mybot set agents.defaults.sandbox.docker.network "none"
 ```
+
+### Gateway port
+
+The port is set during `clawctl create`, but you can change it manually:
+
+```bash
+clawctl config mybot set gateway.port 18800
+```
+
+> **Tip:** Run `clawctl config mybot get` to view the current configuration. For the full config reference, see the [openclaw docs](https://docs.openclaw.ai/cli/sandbox).
+
+## Docker sandbox setup
+
+See [sandbox.md](sandbox.md) for Docker sandbox configuration, including image setup, sandbox mode, network access, auto-prune, and sandbox management.
 
 ## WeChat channel setup
 
