@@ -26,7 +26,7 @@ fi
 
 echo ""
 echo "$(color_green '╔══════════════════════════════════════════╗')"
-echo "$(color_green '║')   OpenClaw Upgrade                     $(color_green '║')"
+echo "$(color_green '║')   OpenClaw Upgrade                       $(color_green '║')"
 echo "$(color_green '╚══════════════════════════════════════════╝')"
 echo ""
 
@@ -58,8 +58,10 @@ if [[ -d "$PROFILES_DIR" ]]; then
         profile_name=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
 
         # Check if the weixin plugin is installed in this profile
-        if OPENCLAW_HOME="$profile_dir" openclaw plugins list 2>/dev/null | grep -q "openclaw-weixin"; then
+        plugin_dir="$profile_dir/.openclaw/extensions/openclaw-weixin"
+        if [[ -d "$plugin_dir" ]]; then
             info "  Upgrading plugin in profile '${profile_name}'..."
+            rm -rf "$plugin_dir"
             OPENCLAW_HOME="$profile_dir" openclaw plugins install "@tencent-weixin/openclaw-weixin@latest" || {
                 warn "  Failed to upgrade plugin in profile '${profile_name}'"
                 continue

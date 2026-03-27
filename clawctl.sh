@@ -10,6 +10,7 @@ set -euo pipefail
 #   clawctl stop    <name>  - Stop the gateway
 #   clawctl restart <name>  - Restart the gateway
 #   clawctl status  <name>  - Show instance status
+#   clawctl info    <name>  - Show profile directory info
 #   clawctl logs    <name> [--follow] [--limit <n>]  - View instance logs
 #   clawctl config  <name> [args...]  - Configure a profile (passthrough to openclaw)
 #   clawctl sandbox <name> [args...]  - Manage sandbox (passthrough to openclaw)
@@ -856,6 +857,46 @@ cmd_buildimage() {
     info "Image '${image_name}' built successfully!"
 }
 
+cmd_info() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        error "Usage: clawctl info <name>"
+        exit 1
+    fi
+
+    local profile_dir
+    profile_dir=$(get_profile_dir "$profile")
+
+    if [[ ! -f "$profile_dir/profile.conf" ]]; then
+        error "Profile '$profile' not found."
+        exit 1
+    fi
+
+    local port created
+    port=$(grep '^PORT=' "$profile_dir/profile.conf" 2>/dev/null | cut -d= -f2)
+    created=$(grep '^CREATED=' "$profile_dir/profile.conf" 2>/dev/null | cut -d= -f2)
+
+    echo ""
+    echo "Profile: $(color_cyan "$profile")"
+    echo ""
+    echo "  $(color_cyan 'Profile dir:')    $profile_dir"
+    echo "  $(color_cyan 'Config dir:')     $profile_dir/config"
+    echo "  $(color_cyan 'Log dir:')        $profile_dir/logs"
+    echo "  $(color_cyan 'Extensions dir:') $profile_dir/.openclaw/extensions"
+    echo "  $(color_cyan 'Port:')           ${port:-?}"
+    echo "  $(color_cyan 'Created:')        ${created:-?}"
+    echo ""
+
+    # List directory contents
+    echo "$(color_cyan 'Directory structure:')"
+    if command -v tree &>/dev/null; then
+        tree -L 2 --dirsfirst "$profile_dir"
+    else
+        ls -laR "$profile_dir" 2>/dev/null | head -60
+    fi
+    echo ""
+}
+
 cmd_upgrade() {
     bash "$CLAWCTL_HOME/upgrade.sh"
 }
@@ -874,6 +915,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'stop')      <name>  Stop the gateway"
     echo "  $0 $(color_cyan 'restart')   <name>  Restart the gateway"
     echo "  $0 $(color_cyan 'status')    <name>  Show instance status"
+    echo "  $0 $(color_cyan 'info')      <name>  Show profile directory info"
     echo "  $0 $(color_cyan 'logs')      <name> [--follow] [--limit <n>]  View instance logs"
     echo "  $0 $(color_cyan 'config')    <name> [args...]  Configure a profile"
     echo "  $0 $(color_cyan 'sandbox')   <name> [args...]  Manage sandbox"
@@ -903,6 +945,7 @@ case "$command" in
     stop)       cmd_stop "$@" ;;
     restart)    cmd_restart "$@" ;;
     status)     cmd_status "$@" ;;
+    info)       cmd_info "$@" ;;
     logs)       cmd_logs "$@" ;;
     config)     cmd_config "$@" ;;
     sandbox)    cmd_sandbox "$@" ;;
