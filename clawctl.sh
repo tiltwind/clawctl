@@ -147,7 +147,7 @@ cmd_create() {
 
     echo ""
     echo "$(color_green '╔══════════════════════════════════════════╗')"
-    echo "$(color_green '║')   OpenClaw Gateway Profile Creator       $(color_green '║')"
+    echo "$(color_green '║')   OpenClaw Gateway Profile Creator     $(color_green '║')"
     echo "$(color_green '╚══════════════════════════════════════════╝')"
     echo ""
 
@@ -565,7 +565,7 @@ cmd_remove() {
 cmd_clean() {
     echo ""
     echo "$(color_red '╔══════════════════════════════════════════╗')"
-    echo "$(color_red '║')   OpenClaw Clean                          $(color_red '║')"
+    echo "$(color_red '║')   OpenClaw Clean                       $(color_red '║')"
     echo "$(color_red '╚══════════════════════════════════════════╝')"
     echo ""
     warn "This will perform the following actions:"
@@ -692,7 +692,7 @@ cmd_wechat() {
 
     echo ""
     echo "$(color_green '╔══════════════════════════════════════════╗')"
-    echo "$(color_green '║')   WeChat Channel Setup                    $(color_green '║')"
+    echo "$(color_green '║')   WeChat Channel Setup                 $(color_green '║')"
     echo "$(color_green '╚══════════════════════════════════════════╝')"
     echo ""
 

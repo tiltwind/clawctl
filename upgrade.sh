@@ -26,7 +26,7 @@ fi
 
 echo ""
 echo "$(color_green '╔══════════════════════════════════════════╗')"
-echo "$(color_green '║')   OpenClaw Upgrade                         $(color_green '║')"
+echo "$(color_green '║')   OpenClaw Upgrade                     $(color_green '║')"
 echo "$(color_green '╚══════════════════════════════════════════╝')"
 echo ""
 
@@ -54,7 +54,6 @@ if [[ -d "$PROFILES_DIR" ]]; then
     for conf in "$PROFILES_DIR"/*/profile.conf; do
         [[ -f "$conf" ]] || continue
 
-        local profile_dir profile_name
         profile_dir=$(dirname "$conf")
         profile_name=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
 
