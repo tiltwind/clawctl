@@ -857,9 +857,7 @@ cmd_buildimage() {
 }
 
 cmd_upgrade() {
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    bash "$script_dir/upgrade.sh"
+    bash "$CLAWCTL_HOME/upgrade.sh"
 }
 
 cmd_help() {
