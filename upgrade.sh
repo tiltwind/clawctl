@@ -61,8 +61,7 @@ if [[ -d "$PROFILES_DIR" ]]; then
         plugin_dir="$profile_dir/.openclaw/extensions/openclaw-weixin"
         if [[ -d "$plugin_dir" ]]; then
             info "  Upgrading plugin in profile '${profile_name}'..."
-            rm -rf "$plugin_dir"
-            OPENCLAW_HOME="$profile_dir" openclaw plugins install "@tencent-weixin/openclaw-weixin@latest" || {
+            OPENCLAW_HOME="$profile_dir" npx -y @tencent-weixin/openclaw-weixin-cli@latest install || {
                 warn "  Failed to upgrade plugin in profile '${profile_name}'"
                 continue
             }

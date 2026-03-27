@@ -686,28 +686,12 @@ cmd_wechat() {
 
     load_profile_env "$profile_dir"
 
-    # Step 1: Install the WeChat plugin into the profile
-    info "[1/3] Installing WeChat plugin..."
-    run_openclaw "$profile_dir" plugins install "@tencent-weixin/openclaw-weixin@1.0.3"
-
-    # Step 2: Enable the plugin
-    info "[2/3] Enabling WeChat plugin..."
-    run_openclaw "$profile_dir" config set plugins.entries.openclaw-weixin.enabled true
-
-    # Step 3: Restart gateway if running to pick up the new plugin
-    info "[3/3] Restarting gateway..."
-    if is_running "$profile_dir" || has_systemd_service "$profile"; then
-        cmd_restart "$profile"
-    else
-        warn "Gateway is not running. Start it with: clawctl start $profile"
-    fi
+    # Install and connect WeChat plugin via npx CLI
+    info "Installing WeChat plugin..."
+    OPENCLAW_HOME="$profile_dir" npx -y @tencent-weixin/openclaw-weixin-cli@latest install
 
     echo ""
     info "WeChat channel configured for profile '$profile'!"
-    echo ""
-    echo "  Tips:"
-    echo "    - To isolate conversations per user:"
-    echo "        $(color_cyan "clawctl config $profile set agents.mode per-channel-per-peer")"
     echo ""
 }
 
