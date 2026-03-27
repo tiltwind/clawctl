@@ -19,6 +19,7 @@ set -euo pipefail
 #   clawctl list            - List all profiles
 #   clawctl remove  <name>  - Remove a profile (stop + delete)
 #   clawctl clean           - Clean OpenClaw (stop all, remove CLI, config)
+#   clawctl upgrade         - Upgrade openclaw and plugins to latest
 #   clawctl buildimage      - Build Docker image from openclaw source
 
 CLAWCTL_HOME="${CLAWCTL_HOME:-$HOME/.clawctl}"
@@ -855,6 +856,12 @@ cmd_buildimage() {
     info "Image '${image_name}' built successfully!"
 }
 
+cmd_upgrade() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    bash "$script_dir/upgrade.sh"
+}
+
 cmd_help() {
     echo ""
     echo "$(color_green 'clawctl') - OpenClaw Gateway Instance Manager"
@@ -876,6 +883,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'list')              List all profiles"
     echo "  $0 $(color_cyan 'remove')    <name>  Remove a profile"
     echo "  $0 $(color_cyan 'clean')             Clean OpenClaw (stop all, remove CLI, config)"
+    echo "  $0 $(color_cyan 'upgrade')           Upgrade openclaw and plugins to latest"
     echo "  $0 $(color_cyan 'buildimage')        Build Docker image from openclaw source"
     echo ""
     echo "Profiles are stored in: $PROFILES_DIR"
@@ -904,6 +912,7 @@ case "$command" in
     list)       cmd_list "$@" ;;
     remove)     cmd_remove "$@" ;;
     clean)      cmd_clean "$@" ;;
+    upgrade)    cmd_upgrade "$@" ;;
     buildimage) cmd_buildimage "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
