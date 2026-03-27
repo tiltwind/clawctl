@@ -23,8 +23,7 @@ set -euo pipefail
 #   clawctl upgrade         - Upgrade openclaw and plugins to latest
 #   clawctl buildimage      - Build Docker image from openclaw source
 
-CLAWCTL_HOME="${CLAWCTL_HOME:-$HOME/.clawctl}"
-PROFILES_DIR="${CLAWCTL_HOME}/profiles"
+CLAWCTL_HOME="${CLAWCTL_HOME:-$HOME/.openclaw/clawctl}"
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,7 +92,7 @@ has_systemd_service() {
 
 get_profile_dir() {
     local profile="$1"
-    echo "${PROFILES_DIR}/${profile}"
+    echo "$HOME/.openclaw-${profile}"
 }
 
 is_running() {
@@ -127,10 +126,6 @@ load_profile_env() {
     fi
 }
 
-# Run openclaw with OPENCLAW_HOME set to the profile directory.
-# This ensures all openclaw data (config, plugins, workspace, etc.)
-# lives under $PROFILES_DIR/<profile>/ instead of scattered across
-# ~/.openclaw, ~/.openclaw-<profile>, etc.
 run_openclaw() {
     local profile_dir="$1"
     shift
@@ -170,18 +165,16 @@ cmd_create() {
     port=$(prompt_input "Gateway port" "18789")
 
     # Check port conflict against existing profiles
-    if [[ -d "$PROFILES_DIR" ]]; then
-        for conf in "$PROFILES_DIR"/*/profile.conf; do
-            [[ -f "$conf" ]] || continue
-            local existing_name existing_port
-            existing_name=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
-            existing_port=$(grep '^PORT=' "$conf" 2>/dev/null | cut -d= -f2)
-            if [[ "$existing_port" == "$port" && "$existing_name" != "$profile" ]]; then
-                error "Port ${port} is already used by profile '${existing_name}'"
-                exit 1
-            fi
-        done
-    fi
+    for conf in "$HOME"/.openclaw-*/profile.conf; do
+        [[ -f "$conf" ]] || continue
+        local existing_name existing_port
+        existing_name=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
+        existing_port=$(grep '^PORT=' "$conf" 2>/dev/null | cut -d= -f2)
+        if [[ "$existing_port" == "$port" && "$existing_name" != "$profile" ]]; then
+            error "Port ${port} is already used by profile '${existing_name}'"
+            exit 1
+        fi
+    done
 
     # Check port conflict against running processes
     if lsof -iTCP:"$port" -sTCP:LISTEN -t &>/dev/null; then
@@ -196,7 +189,8 @@ cmd_create() {
     # ─── Generate files ───────────────────────────────────────────────────────
 
     info "Creating profile at: $profile_dir"
-    mkdir -p "$profile_dir/config/workspace"
+    mkdir -p "$HOME/.openclaw/workspace-${profile}"
+    mkdir -p "$profile_dir/config"
     mkdir -p "$profile_dir/logs"
 
     # --- .env ---
@@ -278,7 +272,7 @@ cmd_start() {
     local logfile="${profile_dir}/logs/gateway.log"
 
     info "Starting gateway for profile '$profile' on port ${port:-unknown}..."
-    nohup env OPENCLAW_HOME="$profile_dir" openclaw gateway >> "$logfile" 2>&1 &
+    nohup openclaw gateway >> "$logfile" 2>&1 &
     local pid=$!
     echo "$pid" > "$profile_dir/gateway.pid"
 
@@ -485,17 +479,12 @@ cmd_logs() {
 }
 
 cmd_list() {
-    if [[ ! -d "$PROFILES_DIR" ]]; then
-        info "No profiles found."
-        return
-    fi
-
     local found=false
     echo ""
     printf "$(color_cyan '%-20s %-8s %-10s %-8s')\n" "PROFILE" "PORT" "STATUS" "PID"
     echo "────────────────────────────────────────────────────────"
 
-    for conf in "$PROFILES_DIR"/*/profile.conf; do
+    for conf in "$HOME"/.openclaw-*/profile.conf; do
         [[ -f "$conf" ]] || continue
         found=true
 
@@ -593,22 +582,20 @@ cmd_clean() {
 
     # STEP 1. Stop all running instances
     info "[1/3] Stopping all running gateway instances..."
-    if [[ -d "$PROFILES_DIR" ]]; then
-        for conf in "$PROFILES_DIR"/*/profile.conf; do
-            [[ -f "$conf" ]] || continue
-            local pdir
-            pdir=$(dirname "$conf")
-            if is_running "$pdir"; then
-                local pname
-                pname=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
-                info "  Stopping profile '$pname'..."
-                local pid
-                pid=$(get_pid "$pdir")
-                kill "$pid" 2>/dev/null || true
-                rm -f "$pdir/gateway.pid"
-            fi
-        done
-    fi
+    for conf in "$HOME"/.openclaw-*/profile.conf; do
+        [[ -f "$conf" ]] || continue
+        local pdir
+        pdir=$(dirname "$conf")
+        if is_running "$pdir"; then
+            local pname
+            pname=$(grep '^NAME=' "$conf" 2>/dev/null | cut -d= -f2)
+            info "  Stopping profile '$pname'..."
+            local pid
+            pid=$(get_pid "$pdir")
+            kill "$pid" 2>/dev/null || true
+            rm -f "$pdir/gateway.pid"
+        fi
+    done
     echo "  All instances stopped"
 
     # STEP 2. Uninstall OpenClaw CLI
@@ -632,7 +619,7 @@ cmd_clean() {
     echo ""
     echo "  To also remove clawctl and all profiles:"
     echo "    sudo rm /usr/local/bin/clawctl"
-    echo "    rm -rf ~/.clawctl"
+    echo "    rm -rf ~/.openclaw/clawctl"
     echo ""
 }
 
@@ -926,7 +913,7 @@ cmd_help() {
     echo "  $0 $(color_cyan 'upgrade')           Upgrade openclaw and plugins to latest"
     echo "  $0 $(color_cyan 'buildimage')        Build Docker image from openclaw source"
     echo ""
-    echo "Profiles are stored in: $PROFILES_DIR"
+    echo "Profiles are stored in: ~/.openclaw-<name>"
     echo ""
 }
 

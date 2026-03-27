@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/tiltwind/clawctl.git"
-INSTALL_DIR="${clawctl_HOME:-$HOME/.clawctl}"
+INSTALL_DIR="${CLAWCTL_HOME:-$HOME/.openclaw/clawctl}"
 LINK_PATH="/usr/local/bin/clawctl"
 
 color_green()  { printf '\033[0;32m%s\033[0m' "$*"; }
